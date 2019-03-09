@@ -80,6 +80,7 @@ static int m_getReadPrefs(lua_State *L) {
 	pushReadPrefs(L, mongoc_client_get_read_prefs(checkClient(L, 1)));
 	return 1;
 }
+
 static int m_setReadPrefs(lua_State *L) {
 	mongoc_client_t *client = checkClient(L, 1);
 	mongoc_read_prefs_t *prefs = checkReadPrefs(L, 2);
@@ -108,6 +109,7 @@ static const luaL_Reg funcs[] = {
 
 int newClient(lua_State *L) {
 	mongoc_client_t *client = mongoc_client_new(luaL_checkstring(L, 1));
+  mongoc_client_set_error_api(client, MONGOC_ERROR_API_VERSION_2);
 	luaL_argcheck(L, client, 1, "invalid format");
 	pushHandle(L, client, 0, 0);
 	setType(L, TYPE_CLIENT, funcs);

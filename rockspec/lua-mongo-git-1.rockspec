@@ -41,6 +41,7 @@ build = {
 				'src/objectid.c',
 				'src/readprefs.c',
 				'src/util.c',
+				'src/error.c',
 			},
 			libraries = {'mongoc-1.0', 'bson-1.0'},
 			incdirs = {'$(LIBMONGOC_INCDIR)/libmongoc-1.0', '$(LIBBSON_INCDIR)/libbson-1.0'},

@@ -119,7 +119,19 @@ void checkStatus(lua_State *L, bool status, const bson_error_t *error) {
 int commandError(lua_State *L, const bson_error_t *error) {
 	lua_pushnil(L);
 	if (!error->domain || !error->code || !error->message[0]) return 1; /* No actual error */
-	lua_pushstring(L, error->message);
+
+	newError(L, error, 0);
+	return 2;
+}
+
+static int commandErrorWithReply(lua_State *L, const bson_error_t *error, bson_t *reply) {
+	lua_pushnil(L);
+	if (!error->domain || !error->code || !error->message[0]){
+		bson_destroy(reply);
+    return 1;
+	}
+
+	newError(L, error, reply);
 	return 2;
 }
 
@@ -131,8 +143,7 @@ int commandStatus(lua_State *L, bool status, const bson_error_t *error) {
 
 int commandReply(lua_State *L, bool status, bson_t *reply, const bson_error_t *error) {
 	if (!status) {
-		bson_destroy(reply);
-		return commandError(L, error);
+		return commandErrorWithReply(L, error, reply);
 	}
 	pushBSONWithSteal(L, reply);
 	return 1;

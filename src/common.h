@@ -56,6 +56,7 @@
 #define TYPE_READPREFS "mongo.ReadPrefs"
 #define TYPE_REGEX "mongo.Regex"
 #define TYPE_TIMESTAMP "mongo.Timestamp"
+#define TYPE_ERROR "mongo.Error"
 
 extern char NEW_BINARY, NEW_DATETIME, NEW_DECIMAL128, NEW_JAVASCRIPT, NEW_REGEX, NEW_TIMESTAMP;
 extern char GLOBAL_MAXKEY, GLOBAL_MINKEY, GLOBAL_NULL;
@@ -73,6 +74,7 @@ int newObjectID(lua_State *L);
 int newReadPrefs(lua_State *L);
 int newRegex(lua_State *L);
 int newTimestamp(lua_State *L);
+int newError(lua_State *L, const bson_error_t *error, bson_t *reply);
 
 void pushBSON(lua_State *L, const bson_t *bson, int hidx);
 void pushBSONWithSteal(lua_State *L, bson_t *bson);
@@ -134,6 +136,12 @@ void packParams(lua_State *L, int n);
 int unpackParams(lua_State *L, int idx);
 
 void checkStatus(lua_State *L, bool status, const bson_error_t *error);
+
+const char *errorDomainName(uint32_t domain);
+const char *errorCodeName(uint32_t code);
+const char *errorServerCodeName(uint32_t code);
+const char *errorServerCodeClassName(uint32_t code);
+int pushErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message);
 
 int commandError(lua_State *L, const bson_error_t *error);
 int commandStatus(lua_State *L, bool status, const bson_error_t *error);
