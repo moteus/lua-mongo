@@ -74,7 +74,6 @@ int newObjectID(lua_State *L);
 int newReadPrefs(lua_State *L);
 int newRegex(lua_State *L);
 int newTimestamp(lua_State *L);
-int newError(lua_State *L, const bson_error_t *error, bson_t *reply);
 
 void pushBSON(lua_State *L, const bson_t *bson, int hidx);
 void pushBSONWithSteal(lua_State *L, bson_t *bson);
@@ -92,6 +91,8 @@ void pushMinKey(lua_State *L);
 void pushNull(lua_State *L);
 void pushObjectID(lua_State *L, const bson_oid_t *oid);
 void pushReadPrefs(lua_State *L, const mongoc_read_prefs_t *prefs);
+int pushError(lua_State *L, const bson_error_t *error, bson_t *reply);
+int pushErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message);
 
 int iterateCursor(lua_State *L, mongoc_cursor_t *cursor, int hidx);
 
@@ -137,11 +138,6 @@ int unpackParams(lua_State *L, int idx);
 
 void checkStatus(lua_State *L, bool status, const bson_error_t *error);
 
-const char *errorDomainName(uint32_t domain);
-const char *errorCodeName(uint32_t code);
-const char *errorServerCodeName(uint32_t code);
-const char *errorServerCodeClassName(uint32_t code);
-int pushErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message);
 
 int commandError(lua_State *L, const bson_error_t *error);
 int commandStatus(lua_State *L, bool status, const bson_error_t *error);

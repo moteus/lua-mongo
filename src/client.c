@@ -109,8 +109,8 @@ static const luaL_Reg funcs[] = {
 
 int newClient(lua_State *L) {
 	mongoc_client_t *client = mongoc_client_new(luaL_checkstring(L, 1));
-  mongoc_client_set_error_api(client, MONGOC_ERROR_API_VERSION_2);
 	luaL_argcheck(L, client, 1, "invalid format");
+	mongoc_client_set_error_api(client, MONGOC_ERROR_API_VERSION_2);
 	pushHandle(L, client, 0, 0);
 	setType(L, TYPE_CLIENT, funcs);
 	return 1;
