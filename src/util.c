@@ -119,7 +119,6 @@ void checkStatus(lua_State *L, bool status, const bson_error_t *error) {
 int commandError(lua_State *L, const bson_error_t *error) {
 	lua_pushnil(L);
 	if (!error->domain || !error->code || !error->message[0]) return 1; /* No actual error */
-
 	pushError(L, error, 0);
 	return 2;
 }
@@ -130,7 +129,6 @@ static int commandErrorWithReply(lua_State *L, const bson_error_t *error, bson_t
 		bson_destroy(reply);
 		return 1;
 	}
-
 	pushError(L, error, reply);
 	return 2;
 }

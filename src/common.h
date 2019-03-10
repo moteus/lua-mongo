@@ -138,7 +138,6 @@ int unpackParams(lua_State *L, int idx);
 
 void checkStatus(lua_State *L, bool status, const bson_error_t *error);
 
-
 int commandError(lua_State *L, const bson_error_t *error);
 int commandStatus(lua_State *L, bool status, const bson_error_t *error);
 int commandReply(lua_State *L, bool status, bson_t *reply, const bson_error_t *error);
