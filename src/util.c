@@ -128,7 +128,7 @@ static int commandErrorWithReply(lua_State *L, const bson_error_t *error, bson_t
 	lua_pushnil(L);
 	if (!error->domain || !error->code || !error->message[0]){
 		bson_destroy(reply);
-    return 1;
+		return 1;
 	}
 
 	newError(L, error, reply);

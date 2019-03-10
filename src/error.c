@@ -441,40 +441,56 @@ static int checkError(lua_State *L, int index){
 	return res;
 }
 
-static m_code(lua_State* L) {
-	lua_pushliteral(L, "_code");
+static uint32_t get_code(lua_State* L) {
+	uint32_t code;
+	lua_pushliteral(L, "code");
 	lua_rawget(L, 1);
-	return 1;
+	code = lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	return code;
 }
 
-static m_domain(lua_State* L) {
-	lua_pushliteral(L, "_domain");
+static uint32_t get_domain(lua_State* L) {
+	uint32_t domain;
+	lua_pushliteral(L, "domain");
 	lua_rawget(L, 1);
-	return 1;
+	domain = lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	return domain;
 }
 
-static m_message(lua_State* L) {
-	lua_pushliteral(L, "_message");
+static const char* get_message(lua_State* L) {
+	const char *message;
+	lua_pushliteral(L, "message");
 	lua_rawget(L, 1);
-	return 1;
+	message = lua_tostring(L, -1);
+	lua_pop(L, 1);
+	return message;
 }
 
-static m_reply(lua_State* L) {
-	lua_pushliteral(L, "_reply");
+static bson_t* get_reply(lua_State* L) {
+	bson_t *reply;
+
+	lua_pushliteral(L, "reply");
 	lua_rawget(L, 1);
-	return 1;
+
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+    return 0;
+	}
+
+	reply = checkBSON(L, -1);
+	lua_pop(L, 1);
+
+	return reply;
 }
 
 static m_domainName(lua_State* L) {
-	const char *domain;
-	uint32_t code;
+	uint32_t domain = get_domain(L);
+	const char *domainName = errorDomainName(domain);
 
-	m_domain(L);
-	code = lua_tointeger(L, -1);
-
-	domain = errorDomainName(code);
-	if (domain) {
-		lua_pushstring(L, domain);
+	if (domainName) {
+		lua_pushstring(L, domainName);
 	}
 	else {
 		lua_pushnil(L);
@@ -484,16 +500,9 @@ static m_domainName(lua_State* L) {
 }
 
 static m_name(lua_State* L) {
-	uint32_t code, domain;
+  uint32_t code = get_code(L);
+	uint32_t domain = get_domain(L);
 	const char *name;
-
-	m_domain(L);
-	m_code(L);
-
-	domain = lua_tointeger(L, -2);
-	code = lua_tointeger(L, -1);
-
-	lua_pop(L, 2);
 
 	if (domain == MONGOC_ERROR_SERVER) {
 		name = errorServerCodeName(code);
@@ -504,31 +513,25 @@ static m_name(lua_State* L) {
 
 	if (name) {
 		lua_pushstring(L, name);
-		return 1;
+	}
+	else {
+		lua_pushnil(L);
 	}
 
-	return 0;
+	return 1;
 }
 
 static m_serverClass(lua_State* L) {
-	uint32_t code, domain;
-
-	m_domain(L);
-	m_code(L);
-
-	domain = lua_tointeger(L, -2);
-	code = lua_tointeger(L, -1);
-
-	lua_pop(L, 2);
+	uint32_t code = get_code(L);
+	uint32_t domain = get_domain(L);
+	const char *name = 0;
 
 	if (domain == MONGOC_ERROR_SERVER) {
-		const char *name = errorServerCodeClassName(code);
-		if (name) {
-			lua_pushstring(L, name);
-		}
-		else {
-			lua_pushnil(L);
-		}
+		name = errorServerCodeClassName(code);
+	}
+
+	if (name) {
+		lua_pushstring(L, name);
 	}
 	else {
 		lua_pushnil(L);
@@ -538,40 +541,38 @@ static m_serverClass(lua_State* L) {
 }
 
 static m_hasLabel(lua_State* L) {
+	bson_t *reply;
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
 
-	m_reply(L);
+	reply = get_reply(L);
 
-	if (lua_isnil(L, -1)) {
-		lua_pop(L, 1);
-		lua_pushboolean(L, 0);
-	}
-	else {
-		bson_t *reply = checkBSON(L, -1);
+	if (reply) {
 		const char *label = luaL_checkstring(L, 2);
 		bool code = mongoc_error_has_label(reply, label);
 		lua_pushboolean(L, code ? 1 : 0);
 	}
+	else {
+		lua_pushboolean(L, 0);
+	}
 
 	return 1;
 }
+
+#define ret_true_if(cond) if(cond){lua_pushboolean(L, 1); return 1;}
 
 static int m_isNetworkError(lua_State *L){
 	uint32_t code;
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+	code = get_code(L);
 
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
-
-	if(code == 6){lua_pushboolean(L, 1); return 1;} // HostUnreachable
-	if(code == 7){lua_pushboolean(L, 1); return 1;} // HostNotFound
-	if(code == 89){lua_pushboolean(L, 1); return 1;} // NetworkTimeout
-	if(code == 9001){lua_pushboolean(L, 1); return 1;} // SocketException
+	ret_true_if(code == 6) // HostUnreachable
+	ret_true_if(code == 7) // HostNotFound
+	ret_true_if(code == 89) // NetworkTimeout
+	ret_true_if(code == 9001) // SocketException
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -582,18 +583,16 @@ static int m_isInterruption(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 11601){lua_pushboolean(L, 1); return 1;} // Interrupted
-	if(code == 11600){lua_pushboolean(L, 1); return 1;} // InterruptedAtShutdown
-	if(code == 11602){lua_pushboolean(L, 1); return 1;} // InterruptedDueToStepDown
-	if(code == 262){lua_pushboolean(L, 1); return 1;} // ExceededTimeLimit
-	if(code == 50){lua_pushboolean(L, 1); return 1;} // MaxTimeMSExpired
-	if(code == 237){lua_pushboolean(L, 1); return 1;} // CursorKilled
-	if(code == 24){lua_pushboolean(L, 1); return 1;} // LockTimeout
-	if(code == 279){lua_pushboolean(L, 1); return 1;} // ClientDisconnect
+	ret_true_if(code == 11601) // Interrupted
+	ret_true_if(code == 11600) // InterruptedAtShutdown
+	ret_true_if(code == 11602) // InterruptedDueToStepDown
+	ret_true_if(code == 262) // ExceededTimeLimit
+	ret_true_if(code == 50) // MaxTimeMSExpired
+	ret_true_if(code == 237) // CursorKilled
+	ret_true_if(code == 24) // LockTimeout
+	ret_true_if(code == 279) // ClientDisconnect
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -604,15 +603,13 @@ static int m_isNotMasterError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 10107){lua_pushboolean(L, 1); return 1;} // NotMaster
-	if(code == 13435){lua_pushboolean(L, 1); return 1;} // NotMasterNoSlaveOk
-	if(code == 13436){lua_pushboolean(L, 1); return 1;} // NotMasterOrSecondary
-	if(code == 11602){lua_pushboolean(L, 1); return 1;} // InterruptedDueToStepDown
-	if(code == 189){lua_pushboolean(L, 1); return 1;} // PrimarySteppedDown
+	ret_true_if(code == 10107) // NotMaster
+	ret_true_if(code == 13435) // NotMasterNoSlaveOk
+	ret_true_if(code == 13436) // NotMasterOrSecondary
+	ret_true_if(code == 11602) // InterruptedDueToStepDown
+	ret_true_if(code == 189) // PrimarySteppedDown
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -623,13 +620,11 @@ static int m_isStaleShardVersionError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 13388){lua_pushboolean(L, 1); return 1;} // StaleConfig
-	if(code == 63){lua_pushboolean(L, 1); return 1;} // StaleShardVersion
-	if(code == 150){lua_pushboolean(L, 1); return 1;} // StaleEpoch
+	ret_true_if(code == 13388) // StaleConfig
+	ret_true_if(code == 63) // StaleShardVersion
+	ret_true_if(code == 150) // StaleEpoch
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -640,14 +635,12 @@ static int m_isNeedRetargettingError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 13388){lua_pushboolean(L, 1); return 1;} // StaleConfig
-	if(code == 63){lua_pushboolean(L, 1); return 1;} // StaleShardVersion
-	if(code == 150){lua_pushboolean(L, 1); return 1;} // StaleEpoch
-	if(code == 227){lua_pushboolean(L, 1); return 1;} // CannotImplicitlyCreateCollection
+	ret_true_if(code == 13388) // StaleConfig
+	ret_true_if(code == 63) // StaleShardVersion
+	ret_true_if(code == 150) // StaleEpoch
+	ret_true_if(code == 227) // CannotImplicitlyCreateCollection
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -658,14 +651,12 @@ static int m_isWriteConcernError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 64){lua_pushboolean(L, 1); return 1;} // WriteConcernFailed
-	if(code == 75){lua_pushboolean(L, 1); return 1;} // WriteConcernLegacyOK
-	if(code == 79){lua_pushboolean(L, 1); return 1;} // UnknownReplWriteConcern
-	if(code == 100){lua_pushboolean(L, 1); return 1;} // UnsatisfiableWriteConcern
+	ret_true_if(code == 64) // WriteConcernFailed
+	ret_true_if(code == 75) // WriteConcernLegacyOK
+	ret_true_if(code == 79) // UnknownReplWriteConcern
+	ret_true_if(code == 100) // UnsatisfiableWriteConcern
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -676,12 +667,10 @@ static int m_isShutdownError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 91){lua_pushboolean(L, 1); return 1;} // ShutdownInProgress
-	if(code == 11600){lua_pushboolean(L, 1); return 1;} // InterruptedAtShutdown
+	ret_true_if(code == 91) // ShutdownInProgress
+	ret_true_if(code == 11600) // InterruptedAtShutdown
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -692,12 +681,10 @@ static int m_isConnectionFatalMessageParseError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 223){lua_pushboolean(L, 1); return 1;} // IllegalOpMsgFlag
-	if(code == 233){lua_pushboolean(L, 1); return 1;} // TooManyDocumentSequences
+	ret_true_if(code == 223) // IllegalOpMsgFlag
+	ret_true_if(code == 233) // TooManyDocumentSequences
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -708,13 +695,11 @@ static int m_isExceededTimeLimitError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 262){lua_pushboolean(L, 1); return 1;} // ExceededTimeLimit
-	if(code == 50){lua_pushboolean(L, 1); return 1;} // MaxTimeMSExpired
-	if(code == 202){lua_pushboolean(L, 1); return 1;} // NetworkInterfaceExceededTimeLimit
+	ret_true_if(code == 262) // ExceededTimeLimit
+	ret_true_if(code == 50) // MaxTimeMSExpired
+	ret_true_if(code == 202) // NetworkInterfaceExceededTimeLimit
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -725,14 +710,12 @@ static int m_isSnapshotError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 239){lua_pushboolean(L, 1); return 1;} // SnapshotTooOld
-	if(code == 246){lua_pushboolean(L, 1); return 1;} // SnapshotUnavailable
-	if(code == 250){lua_pushboolean(L, 1); return 1;} // StaleChunkHistory
-	if(code == 272){lua_pushboolean(L, 1); return 1;} // MigrationConflict
+	ret_true_if(code == 239) // SnapshotTooOld
+	ret_true_if(code == 246) // SnapshotUnavailable
+	ret_true_if(code == 250) // StaleChunkHistory
+	ret_true_if(code == 272) // MigrationConflict
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -743,12 +726,10 @@ static int m_isVoteAbortError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 251){lua_pushboolean(L, 1); return 1;} // NoSuchTransaction
-	if(code == 225){lua_pushboolean(L, 1); return 1;} // TransactionTooOld
+	ret_true_if(code == 251) // NoSuchTransaction
+	ret_true_if(code == 225) // TransactionTooOld
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -759,31 +740,26 @@ static int m_isRetryable(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
-	m_code(L);
-	code = lua_tointeger(L, -1);
-	lua_pop(L, 1);
+	code = get_code(L);
 
-	if(code == 6){lua_pushboolean(L, 1); return 1;} // NetworkError:HostUnreachable
-	if(code == 7){lua_pushboolean(L, 1); return 1;} // NetworkError:HostNotFound
-	if(code == 89){lua_pushboolean(L, 1); return 1;} // NetworkError:NetworkTimeout
-	if(code == 9001){lua_pushboolean(L, 1); return 1;} // NetworkError:SocketException
-	if(code == 10107){lua_pushboolean(L, 1); return 1;} // NotMasterError:NotMaster
-	if(code == 13435){lua_pushboolean(L, 1); return 1;} // NotMasterError:NotMasterNoSlaveOk
-	if(code == 13436){lua_pushboolean(L, 1); return 1;} // NotMasterError:NotMasterOrSecondary
-	if(code == 11602){lua_pushboolean(L, 1); return 1;} // NotMasterError:InterruptedDueToStepDown
-	if(code == 189){lua_pushboolean(L, 1); return 1;} // NotMasterError:PrimarySteppedDown
-	if(code == 91){lua_pushboolean(L, 1); return 1;} // ShutdownError:ShutdownInProgress
-	if(code == 11600){lua_pushboolean(L, 1); return 1;} // ShutdownError:InterruptedAtShutdown
+	ret_true_if(code == 6) // NetworkError:HostUnreachable
+	ret_true_if(code == 7) // NetworkError:HostNotFound
+	ret_true_if(code == 89) // NetworkError:NetworkTimeout
+	ret_true_if(code == 9001) // NetworkError:SocketException
+	ret_true_if(code == 10107) // NotMasterError:NotMaster
+	ret_true_if(code == 13435) // NotMasterError:NotMasterNoSlaveOk
+	ret_true_if(code == 13436) // NotMasterError:NotMasterOrSecondary
+	ret_true_if(code == 11602) // NotMasterError:InterruptedDueToStepDown
+	ret_true_if(code == 189) // NotMasterError:PrimarySteppedDown
+	ret_true_if(code == 91) // ShutdownError:ShutdownInProgress
+	ret_true_if(code == 11600) // ShutdownError:InterruptedAtShutdown
 
 	lua_pushboolean(L, 0);
 	return 1;
 }
 
+#define METHODS_OFFSET 3
 const char *keys[] = {
-	"code",
-	"domain",
-	"message",
-	"reply",
 	"domainName",
 	"name",
 	"serverClass",
@@ -806,10 +782,6 @@ const char *keys[] = {
 };
 
 static const lua_CFunction m_getters[] = {
-	m_code,
-	m_domain,
-	m_message,
-	m_reply,
 	m_domainName,
 	m_name,
 	m_serverClass,
@@ -839,7 +811,7 @@ static int m_index(lua_State *L) {
 
 	key = luaL_checkoption(L, 2, 0, keys);
 
-	if (key < 7) {
+	if (key < METHODS_OFFSET) {
 		lua_settop(L, 1);
 		return m_getters[key](L);
 	}
@@ -857,24 +829,11 @@ static int m_newIndex(lua_State *L){
 }
 
 static int m_tostring(lua_State *L) {
-	uint32_t code, domain;
-	const char *message;
-
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
 
-	m_message(L);
-	m_domain(L);
-	m_code(L);
-
-	message = lua_tostring(L, -3);
-	domain = lua_tointeger(L, -2);
-	code = lua_tointeger(L, -1);
-
-	lua_pop(L, 3);
-
-	return pushErrorMessage(L, domain, code, message);
+	return pushErrorMessage(L, get_domain(L), get_code(L), get_message(L));
 }
 
 int pushErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message) {
@@ -935,20 +894,20 @@ int newError(lua_State *L, const bson_error_t *error, bson_t *reply) {
 	lua_createtable(L, 0, 4);
 	setType(L, TYPE_ERROR, funcs);
 
-	lua_pushliteral(L, "_domain");
+	lua_pushliteral(L, "domain");
 	lua_pushinteger(L, error->domain);
 	lua_rawset(L, -3);
 
-	lua_pushliteral(L, "_code");
+	lua_pushliteral(L, "code");
 	lua_pushinteger(L, error->code);
 	lua_rawset(L, -3);
 
-	lua_pushliteral(L, "_message");
+	lua_pushliteral(L, "message");
 	lua_pushstring(L, error->message);
 	lua_rawset(L, -3);
 
 	if (reply) {
-		lua_pushliteral(L, "_reply");
+		lua_pushliteral(L, "reply");
 		pushBSONWithSteal(L, reply);
 		lua_rawset(L, -3);
 	}
