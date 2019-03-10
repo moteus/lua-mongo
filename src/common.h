@@ -91,8 +91,8 @@ void pushMinKey(lua_State *L);
 void pushNull(lua_State *L);
 void pushObjectID(lua_State *L, const bson_oid_t *oid);
 void pushReadPrefs(lua_State *L, const mongoc_read_prefs_t *prefs);
-int pushError(lua_State *L, const bson_error_t *error, bson_t *reply);
-int pushErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message);
+void pushError(lua_State *L, const bson_error_t *error, bson_t *reply);
+void pushErrorMessage(lua_State *L, const bson_error_t *error, bson_t *reply);
 
 int iterateCursor(lua_State *L, mongoc_cursor_t *cursor, int hidx);
 

@@ -427,6 +427,53 @@ static const char *errorServerCodeClassName(uint32_t code) {
 	return 0;
 }
 
+int buildErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message) {
+	//[MONGO][DOMAIN][CLASS][ERROR] message
+
+	const char *domainName, *klass = 0, *name;
+
+	// category
+	lua_pushliteral(L, "[MONGO]");
+
+	if (BSON_LIKELY(domainName = errorDomainName(domain))) {
+		lua_pushfstring(L, "[%s]", domainName);
+	}
+	else {
+		lua_pushfstring(L, "[%d]", domain);
+	}
+
+	if (domain == MONGOC_ERROR_SERVER) {
+		klass = errorServerCodeClassName(code);
+		name = errorServerCodeName(code);
+		if (klass) {
+			lua_pushfstring(L, "[%s]", klass);
+		}
+	}
+	else {
+		name = errorCodeName(code);
+	}
+
+	if (name) {
+		lua_pushfstring(L, "[%s] ", name);
+	}
+	else {
+		lua_pushfstring(L, "[%d] ", code);
+	}
+
+	if (BSON_LIKELY(message)) {
+		lua_pushstring(L, message);
+	}
+	else
+	{
+		lua_pushliteral(L, "");
+	}
+
+	lua_concat(L, klass ? 5 : 4);
+
+	return 1;
+}
+
+
 static int checkError(lua_State *L, int index){
 	int top = lua_gettop(L), res = 0;
 	if (BSON_LIKELY(lua_istable(L, index))) {
@@ -833,53 +880,7 @@ static int m_tostring(lua_State *L) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
 
-	return pushErrorMessage(L, getErrorDomain(L), getErrorCode(L), getErrorMessage(L));
-}
-
-int pushErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message) {
-	//[MONGO][DOMAIN][CLASS][ERROR] message
-
-	const char *domainName, *klass = 0, *name;
-
-	// category
-	lua_pushliteral(L, "[MONGO]");
-
-	if (BSON_LIKELY(domainName = errorDomainName(domain))) {
-		lua_pushfstring(L, "[%s]", domainName);
-	}
-	else {
-		lua_pushfstring(L, "[%d]", domain);
-	}
-
-	if (domain == MONGOC_ERROR_SERVER) {
-		klass = errorServerCodeClassName(code);
-		name = errorServerCodeName(code);
-		if (klass) {
-			lua_pushfstring(L, "[%s]", klass);
-		}
-	}
-	else {
-		name = errorCodeName(code);
-	}
-
-	if (name) {
-		lua_pushfstring(L, "[%s] ", name);
-	}
-	else {
-		lua_pushfstring(L, "[%d] ", code);
-	}
-
-	if (BSON_LIKELY(message)) {
-		lua_pushstring(L, message);
-	}
-	else
-	{
-		lua_pushliteral(L, "");
-	}
-
-	lua_concat(L, klass ? 5 : 4);
-
-	return 1;
+	return buildErrorMessage(L, getErrorDomain(L), getErrorCode(L), getErrorMessage(L));
 }
 
 static const luaL_Reg funcs[] = {
@@ -890,7 +891,14 @@ static const luaL_Reg funcs[] = {
 	{ 0, 0 },
 };
 
-int pushError(lua_State *L, const bson_error_t *error, bson_t *reply) {
+void pushErrorMessage(lua_State *L, const bson_error_t *error, bson_t *reply) {
+	if (reply) {
+		bson_destroy(reply);
+	}
+	buildErrorMessage(L, error->domain, error->code, error->message);
+}
+
+void pushError(lua_State *L, const bson_error_t *error, bson_t *reply) {
 	lua_createtable(L, 0, 4);
 	setType(L, TYPE_ERROR, funcs);
 
@@ -911,6 +919,4 @@ int pushError(lua_State *L, const bson_error_t *error, bson_t *reply) {
 		pushBSONWithSteal(L, reply);
 		lua_rawset(L, -3);
 	}
-
-  return 1;
 }
