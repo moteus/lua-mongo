@@ -428,9 +428,9 @@ static const char *errorServerCodeClassName(uint32_t code) {
 }
 
 int buildErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *message) {
-	//[MONGO][DOMAIN][CLASS][ERROR] message
+	//[MONGO][DOMAIN][ERROR] message
 
-	const char *domainName, *klass = 0, *name;
+	const char *domainName, *name;
 
 	// category
 	lua_pushliteral(L, "[MONGO]");
@@ -443,17 +443,13 @@ int buildErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *
 	}
 
 	if (domain == MONGOC_ERROR_SERVER) {
-		klass = errorServerCodeClassName(code);
 		name = errorServerCodeName(code);
-		if (klass) {
-			lua_pushfstring(L, "[%s]", klass);
-		}
 	}
 	else {
 		name = errorCodeName(code);
 	}
 
-	if (name) {
+	if (BSON_LIKELY(name)) {
 		lua_pushfstring(L, "[%s] ", name);
 	}
 	else {
@@ -468,11 +464,10 @@ int buildErrorMessage(lua_State *L, uint32_t domain, uint32_t code, const char *
 		lua_pushliteral(L, "");
 	}
 
-	lua_concat(L, klass ? 5 : 4);
+	lua_concat(L, 4);
 
 	return 1;
 }
-
 
 static int checkError(lua_State *L, int index){
 	int top = lua_gettop(L), res = 0;
@@ -546,7 +541,7 @@ static m_domainName(lua_State* L) {
 	return 1;
 }
 
-static m_name(lua_State* L) {
+static m_codeName(lua_State* L) {
   uint32_t code = getErrorCode(L);
 	uint32_t domain = getErrorDomain(L);
 	const char *name;
@@ -614,6 +609,11 @@ static int m_isNetworkError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 6) // HostUnreachable
@@ -629,6 +629,11 @@ static int m_isInterruption(lua_State *L){
 	uint32_t code;
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
+	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
 	}
 	code = getErrorCode(L);
 
@@ -650,6 +655,11 @@ static int m_isNotMasterError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 10107) // NotMaster
@@ -667,6 +677,11 @@ static int m_isStaleShardVersionError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 13388) // StaleConfig
@@ -681,6 +696,11 @@ static int m_isNeedRetargettingError(lua_State *L){
 	uint32_t code;
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
+	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
 	}
 	code = getErrorCode(L);
 
@@ -698,6 +718,11 @@ static int m_isWriteConcernError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 64) // WriteConcernFailed
@@ -714,6 +739,11 @@ static int m_isShutdownError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 91) // ShutdownInProgress
@@ -727,6 +757,11 @@ static int m_isConnectionFatalMessageParseError(lua_State *L){
 	uint32_t code;
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
+	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
 	}
 	code = getErrorCode(L);
 
@@ -742,6 +777,11 @@ static int m_isExceededTimeLimitError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 262) // ExceededTimeLimit
@@ -756,6 +796,11 @@ static int m_isSnapshotError(lua_State *L){
 	uint32_t code;
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
+	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
 	}
 	code = getErrorCode(L);
 
@@ -773,6 +818,11 @@ static int m_isVoteAbortError(lua_State *L){
 	if (BSON_UNLIKELY(!checkError(L, 1))) {
 		return typeError(L, 1, TYPE_ERROR);
 	}
+
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		lua_pushboolean(L, 0);
+		return 1;
+	}
 	code = getErrorCode(L);
 
 	ret_true_if(code == 251) // NoSuchTransaction
@@ -789,17 +839,19 @@ static int m_isRetryable(lua_State *L){
 	}
 	code = getErrorCode(L);
 
-	ret_true_if(code == 6) // NetworkError:HostUnreachable
-	ret_true_if(code == 7) // NetworkError:HostNotFound
-	ret_true_if(code == 89) // NetworkError:NetworkTimeout
-	ret_true_if(code == 9001) // NetworkError:SocketException
-	ret_true_if(code == 10107) // NotMasterError:NotMaster
-	ret_true_if(code == 13435) // NotMasterError:NotMasterNoSlaveOk
-	ret_true_if(code == 13436) // NotMasterError:NotMasterOrSecondary
-	ret_true_if(code == 11602) // NotMasterError:InterruptedDueToStepDown
-	ret_true_if(code == 189) // NotMasterError:PrimarySteppedDown
-	ret_true_if(code == 91) // ShutdownError:ShutdownInProgress
-	ret_true_if(code == 11600) // ShutdownError:InterruptedAtShutdown
+	if(MONGOC_ERROR_SERVER != getErrorDomain(L)){
+		ret_true_if(code == 6) // NetworkError:HostUnreachable
+		ret_true_if(code == 7) // NetworkError:HostNotFound
+		ret_true_if(code == 89) // NetworkError:NetworkTimeout
+		ret_true_if(code == 9001) // NetworkError:SocketException
+		ret_true_if(code == 10107) // NotMasterError:NotMaster
+		ret_true_if(code == 13435) // NotMasterError:NotMasterNoSlaveOk
+		ret_true_if(code == 13436) // NotMasterError:NotMasterOrSecondary
+		ret_true_if(code == 11602) // NotMasterError:InterruptedDueToStepDown
+		ret_true_if(code == 189) // NotMasterError:PrimarySteppedDown
+		ret_true_if(code == 91) // ShutdownError:ShutdownInProgress
+		ret_true_if(code == 11600) // ShutdownError:InterruptedAtShutdown
+	}
 
 	lua_pushboolean(L, 0);
 	return 1;
@@ -808,7 +860,7 @@ static int m_isRetryable(lua_State *L){
 #define METHODS_OFFSET 3
 const char *keys[] = {
 	"domainName",
-	"name",
+	"codeName",
 	"serverClass",
 
 	// methods
@@ -830,7 +882,7 @@ const char *keys[] = {
 
 static const lua_CFunction m_getters[] = {
 	m_domainName,
-	m_name,
+	m_codeName,
 	m_serverClass,
 
 	// methods
